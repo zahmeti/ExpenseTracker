@@ -1,0 +1,26 @@
+@page "/profile"
+@using Microsoft.AspNetCore.Components.Authorization
+@inject AuthenticationStateProvider AuthStateProvider
+
+<div class="glass-card profile-card text-center p-4">
+    <h3 class="gradient-title">Profile</h3>
+
+    <!-- Avatar Icon -->
+    <div class="avatar-circle mb-3">
+        <span class="oi oi-person avatar-icon"></span>
+    </div>
+
+    <!-- User Info -->
+    <p class="profile-email">You are logged in as <strong>@userEmail</strong></p>
+    
+</div>
+
+@code {
+    private string userEmail = "";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        userEmail = authState.User.Identity?.Name ?? "Unknown";
+    }
+}

@@ -1,0 +1,142 @@
+﻿@page "/"
+@using Microsoft.AspNetCore.Components.Authorization
+@using ExpenseTracker.Services
+@using ExpenseTracker.Models
+@using System.Globalization
+@using System.Security.Claims
+@inject ExpenseService ExpenseService
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthStateProvider
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <h3 class="gradient-title">Dashboard</h3>
+
+        <!-- Motivational Message -->
+        <div class="glass-card p-3 mb-4 text-center">
+            <h5>@motivationalMessage</h5>
+        </div>
+
+        <!-- Animated Progress Rings -->
+        <div class="row text-center mb-4">
+            <div class="col-md-4">
+                <div class="progress-ring-card">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle id="totalCircle" class="progress-ring__circle" stroke="#4facfe" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+                        <text id="totalText" x="60" y="65" text-anchor="middle" font-size="18" fill="#333" font-weight="bold">0%</text>
+                    </svg>
+                    <h6>Total Expenses</h6>
+                    <p>@totalExpenses €</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="progress-ring-card">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle id="monthCircle" class="progress-ring__circle" stroke="#43e97b" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+                        <text id="monthText" x="60" y="65" text-anchor="middle" font-size="18" fill="#333" font-weight="bold">0%</text>
+                    </svg>
+                    <h6>Current Month</h6>
+                    <p>@monthlyTotal €</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="progress-ring-card">
+                    <svg class="progress-ring" width="120" height="120">
+                        <circle id="weekCircle" class="progress-ring__circle" stroke="#f7971e" stroke-width="10" fill="transparent" r="50" cx="60" cy="60"/>
+                        <text id="weekText" x="60" y="65" text-anchor="middle" font-size="18" fill="#333" font-weight="bold">0%</text>
+                    </svg>
+                    <h6>Current Week</h6>
+                    <p>@weeklyTotal €</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Expenses -->
+        <div class="glass-card p-4">
+            <h5 class="section-title">Recent Expenses</h5>
+            <table class="table table-hover stylish-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Title</th>
+                        <th>Category</th>
+                        <th>Amount (€)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var expense in recentExpenses)
+                    {
+                        <tr>
+                            <td>@expense.Date.ToShortDateString()</td>
+                            <td>@expense.Title</td>
+                            <td><span class="badge category-badge">@expense.Category</span></td>
+                            <td>@expense.Amount</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </Authorized>
+
+    <NotAuthorized>
+        <div class="glass-card p-4 text-center">
+            <h5>Please log in to view your dashboard.</h5>
+            <a class="btn btn-gradient mt-3" href="/authentication/login">Log In</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    private decimal totalExpenses;
+    private decimal monthlyTotal;
+    private decimal weeklyTotal;
+    private List<Expense> recentExpenses = new();
+    private string motivationalMessage = "";
+
+    private decimal yearlyBudget = 2500m;
+    private decimal monthlyBudget = 2500m;
+    private decimal weeklyBudget = 700m;
+
+    private ClaimsPrincipal? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User;
+
+        var now = DateTime.Now;
+        totalExpenses = ExpenseService.GetTotalExpenses(currentUser);
+        monthlyTotal = ExpenseService.GetMonthlyTotal(now.Year, now.Month, currentUser);
+        weeklyTotal = ExpenseService.GetWeeklyTotal(now.Year, ISOWeek.GetWeekOfYear(now), currentUser);
+        recentExpenses = ExpenseService.GetRecentExpenses(currentUser);
+
+        SetMotivationalMessage();
+    }
+
+    private void SetMotivationalMessage()
+    {
+        var monthPercent = monthlyTotal / monthlyBudget * 100;
+
+        if (monthPercent < 70)
+            motivationalMessage = "🎉 Great job, you’re well under budget!";
+        else if (monthPercent < 90)
+            motivationalMessage = "⚠️ Careful — you’re getting close to your monthly limit.";
+        else
+            motivationalMessage = "🚨 Alert! You’ve exceeded 90% of your monthly budget.";
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var totalPercent = (double)(totalExpenses / yearlyBudget * 100);
+            var monthPercent = (double)(monthlyTotal / monthlyBudget * 100);
+            var weekPercent = (double)(weeklyTotal / weeklyBudget * 100);
+
+            await JSRuntime.InvokeVoidAsync("setProgress", "totalCircle", totalPercent);
+            await JSRuntime.InvokeVoidAsync("setProgress", "monthCircle", monthPercent);
+            await JSRuntime.InvokeVoidAsync("setProgress", "weekCircle", weekPercent);
+        }
+    }
+}

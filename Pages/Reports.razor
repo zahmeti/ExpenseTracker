@@ -1,0 +1,193 @@
+@page "/reports"
+@using ExpenseTracker.Models
+@using ExpenseTracker.Services
+@using System.Globalization
+@using System.Security.Claims
+@inject ExpenseService ExpenseService
+@inject IJSRuntime JSRuntime
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3 class="gradient-title">Reports</h3>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-primary-gradient p-3">
+            <h6>Total Expenses</h6>
+            <h4>@totalExpenses €</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-success-gradient p-3">
+            <h6>Current Month</h6>
+            <h4>@monthlyTotal €</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-warning-gradient p-3">
+            <h6>Current Week</h6>
+            <h4>@weeklyTotal €</h4>
+        </div>
+    </div>
+</div>
+
+<!-- Filter Dropdown -->
+<div class="filter-section mb-3">
+    <label for="monthFilter" class="me-2">View:</label>
+    <select id="monthFilter" class="form-select w-auto d-inline-block" @onchange="OnMonthFilterChanged">
+        <option value="year">Whole Year</option>
+        <option value="current">This Month</option>
+        <option value="1">January</option>
+        <option value="2">February</option>
+        <option value="3">March</option>
+        <option value="4">April</option>
+        <option value="5">May</option>
+        <option value="6">June</option>
+        <option value="7">July</option>
+        <option value="8">August</option>
+        <option value="9">September</option>
+        <option value="10">October</option>
+        <option value="11">November</option>
+        <option value="12">December</option>
+    </select>
+</div>
+
+<!-- Monthly Breakdown Chart -->
+<div class="wide-chart-section">
+    <h5 class="section-title">Monthly Breakdown</h5>
+    <div class="chart-container">
+        <canvas id="monthlyChart"></canvas>
+    </div>
+</div>
+
+<!-- Category Distribution Chart -->
+<div class="small-chart-section">
+    <h5 class="section-title text-start">Expenses by Category</h5>
+    <div class="chart-container">
+        <canvas id="categoryChart"></canvas>
+    </div>
+</div>
+
+<!-- Top Categories -->
+<div class="glass-card p-4 mb-4">
+    <h5 class="section-title text-start">Top Categories</h5>
+    <div class="row">
+        @foreach (var entry in topCategories)
+        {
+            var total = topCategories.Values.Sum(v => (double)v);
+            var percentage = total > 0 ? (entry.Value / (decimal)total * 100).ToString("0.0") : "0";
+
+            var categoryClass = entry.Key switch
+            {
+                "Food" => "card-food",
+                "Transport" => "card-transport",
+                "Shopping" => "card-shopping",
+                "Entertainment" => "card-entertainment",
+                "Bills & Utilities" => "card-bills",
+                _ => "card-other"
+            };
+
+            <div class="col-md-4">
+                <div class="glass-card p-3 mb-3 stylish-card @categoryClass">
+                    <h6 class="category-name">@entry.Key</h6>
+                    <p class="category-value">
+                        <strong>@entry.Value €</strong> (@percentage%)
+                    </p>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<!-- Recent Expenses -->
+<div class="glass-card p-4 mb-4">
+    <h5 class="section-title text-start">Recent Expenses</h5>
+    <div class="table-responsive">
+        <table class="table stylish-table recent-expenses-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Description</th>
+                    <th>Category</th>
+                    <th>Amount (€)</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var expense in recentExpenses)
+                {
+                    <tr>
+                        <td>@expense.Date.ToShortDateString()</td>
+                        <td>@expense.Title</td>
+                        <td><span class="badge category-badge">@expense.Category</span></td>
+                        <td class="amount-cell">€@expense.Amount</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@code {
+    private decimal totalExpenses;
+    private decimal monthlyTotal;
+    private decimal weeklyTotal;
+    private Dictionary<string, decimal> topCategories = new();
+    private List<Expense> recentExpenses = new();
+    private Dictionary<string, decimal> monthlyBreakdown = new();
+
+    private ClaimsPrincipal? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User;
+
+        if (currentUser == null) return;
+
+        var now = DateTime.Now;
+        totalExpenses = ExpenseService.GetTotalExpenses(currentUser);
+        monthlyTotal = ExpenseService.GetMonthlyTotal(now.Year, now.Month, currentUser);
+        weeklyTotal = ExpenseService.GetWeeklyTotal(now.Year, ISOWeek.GetWeekOfYear(now), currentUser);
+        topCategories = ExpenseService.GetTopCategories(currentUser);
+        recentExpenses = ExpenseService.GetRecentExpenses(currentUser);
+        monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
+    }
+
+    private async Task OnMonthFilterChanged(ChangeEventArgs e)
+    {
+        if (currentUser == null) return;
+
+        var filter = e.Value?.ToString();
+        var now = DateTime.Now;
+
+        if (filter == "year")
+        {
+            monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
+            topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser);
+        }
+        else if (filter == "current")
+        {
+            monthlyBreakdown = ExpenseService.GetDailyBreakdown(now.Year, now.Month, currentUser);
+            topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, now.Month);
+        }
+        else
+        {
+            int month = int.Parse(filter);
+            monthlyBreakdown = ExpenseService.GetDailyBreakdown(now.Year, month, currentUser);
+            topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, month);
+        }
+
+        await RenderCharts();
+    }
+
+    private async Task RenderCharts()
+    {
+        var monthlyLabels = monthlyBreakdown.Keys.ToArray();
+        var monthlyData = monthlyBreakdown.Values.ToArray();
+        await JSRuntime.InvokeVoidAsync("renderBudgetChart", monthlyLabels, monthlyData);
+
+        var categoryLabels = topCategories.Keys.ToArray();
+        var categoryData = topCategories.Values.ToArray();
+        await JSRuntime.InvokeVoidAsync("renderExpenseChart", categoryLabels, categoryData);
+    }
+}

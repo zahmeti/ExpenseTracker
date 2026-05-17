@@ -1,0 +1,45 @@
+@page "/authentication/logout"
+@layout AuthLayout
+
+<div class="auth-wrapper">
+    <div class="auth-left">
+        <div class="brand-mark">
+            <span class="oi oi-briefcase"></span>
+        </div>
+        <h2 class="app-title">Expense Tracker</h2>
+        <p class="tagline">Track your expenses. Save more. Achieve your goals.</p>
+        <div class="auth-visual" aria-hidden="true">
+            <div class="balance-preview">
+                <div class="preview-kicker">Total Balance</div>
+                <strong>$2,548.00</strong>
+                <div class="preview-line"></div>
+            </div>
+            <div class="chart-preview">
+                <div class="donut"></div>
+                <div class="legend-lines">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+            <div class="phone-preview">
+                <div class="phone-title">Recent Expenses</div>
+                <div class="expense-row"><span></span>Food <strong>$120</strong></div>
+                <div class="expense-row"><span></span>Transport <strong>$45</strong></div>
+                <div class="expense-row"><span></span>Shopping <strong>$89</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-right">
+        <div class="glass-card login-card text-center p-4">
+            <h3 class="gradient-title">Logout</h3>
+            <p class="auth-subtitle">Are you sure you want to log out?</p>
+            <form method="post" action="/authentication/logout">
+                <button class="btn btn-gradient w-100 mt-3" type="submit">Logout</button>
+            </form>
+            <a href="/" class="btn btn-outline-auth w-100 mt-3">Cancel</a>
+        </div>
+        <p class="footer-tagline">Track smarter. Spend better.</p>
+    </div>
+</div>

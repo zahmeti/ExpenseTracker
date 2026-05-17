@@ -1,0 +1,286 @@
+@page "/expenses"
+@using ExpenseTracker.Models
+@using ExpenseTracker.Services
+@using System.Globalization
+@using System.Security.Claims
+@inject ExpenseService ExpenseService
+@inject CategoryService CategoryService
+@inject AuthenticationStateProvider AuthStateProvider
+
+<h3 class="gradient-title">Expenses</h3>
+
+<!-- Add Expense Form -->
+<div class="glass-card p-4 mb-4">
+    <h5 class="section-title">Add Expense</h5>
+    <div class="row g-3">
+        <div class="col-md-3">
+            <input class="form-control stylish-input" @bind="newExpense.Title" placeholder="Title" />
+        </div>
+        <div class="col-md-2">
+            <input type="number" class="form-control stylish-input" @bind="newExpense.Amount" placeholder="Amount (€)" />
+        </div>
+        <div class="col-md-3">
+            <select class="form-select stylish-input" @bind="newExpense.Category">
+                <option value="">-- Category --</option>
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Name">@category.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-md-2">
+            <input type="date" class="form-control stylish-input" @bind="newExpense.Date" />
+        </div>
+        <div class="col-md-2">
+            <button class="btn btn-gradient w-100" @onclick="AddExpense">➕ Add</button>
+        </div>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="row mb-4">
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-primary-gradient p-3">
+            <h6>Current Month</h6>
+            <h4>@monthlyTotal €</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-success-gradient p-3">
+            <h6>Current Week</h6>
+            <h4>@weeklyTotal €</h4>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="glass-card text-white bg-warning-gradient p-3">
+            <h6>@selectedCategory Total</h6>
+            <h4>@categoryTotal €</h4>
+        </div>
+    </div>
+</div>
+
+<!-- Expense List -->
+<div class="glass-card p-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+        <h5 class="section-title mb-0">Expenses</h5>
+        <span class="filter-summary">@expenses.Count expense@(expenses.Count == 1 ? "" : "s") · @filteredTotal € total</span>
+    </div>
+
+    <div class="filter-panel mb-4">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="filter-label">Category</label>
+                <select class="form-select stylish-input" @bind="filterCategory">
+                    <option value="">All categories</option>
+                    @foreach (var category in categories)
+                    {
+                        <option value="@category.Name">@category.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label">From date</label>
+                <input type="date" class="form-control stylish-input" @bind="filterStartDate" />
+            </div>
+            <div class="col-md-3">
+                <label class="filter-label">To date</label>
+                <input type="date" class="form-control stylish-input" @bind="filterEndDate" />
+            </div>
+            <div class="col-md-3">
+                <div class="d-flex gap-2">
+                    <button class="btn btn-gradient flex-fill" @onclick="ApplyFilters">Filter</button>
+                    <button class="btn btn-outline-secondary flex-fill" @onclick="ClearFilters">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <table class="table table-hover stylish-table">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Title</th>
+                <th>Category</th>
+                <th>Amount (€)</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (expenses.Count == 0)
+            {
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">No expenses match your filters.</td>
+                </tr>
+            }
+            else
+            {
+                @foreach (var expense in expenses)
+                {
+                    <tr>
+                        @if (editingExpense?.Id == expense.Id)
+                        {
+                            <td><input type="date" class="form-control stylish-input" @bind="editingExpense.Date" /></td>
+                            <td><input class="form-control stylish-input" @bind="editingExpense.Title" /></td>
+                            <td>
+                                <select class="form-select stylish-input" @bind="editingExpense.Category">
+                                    @foreach (var category in categories)
+                                    {
+                                        <option value="@category.Name">@category.Name</option>
+                                    }
+                                </select>
+                            </td>
+                            <td><input type="number" class="form-control stylish-input" @bind="editingExpense.Amount" /></td>
+                            <td>
+                                <button class="btn btn-sm btn-gradient" @onclick="SaveExpense">💾 Save</button>
+                                <button class="btn btn-sm btn-secondary" @onclick="CancelEdit">✖ Cancel</button>
+                            </td>
+                        }
+                        else
+                        {
+                            <td>@expense.Date.ToShortDateString()</td>
+                            <td>@expense.Title</td>
+                            <td><span class="badge category-badge">@expense.Category</span></td>
+                            <td>@expense.Amount</td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-warning rounded-circle" @onclick="() => EditExpense(expense)">✏️</button>
+                                <button class="btn btn-sm btn-outline-danger rounded-circle" @onclick="() => DeleteExpense(expense.Id)">🗑️</button>
+                            </td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    private List<Expense> expenses = new();
+    private Expense newExpense = new();
+    private Expense? editingExpense;
+
+    private List<Category> categories = new();
+    private string filterCategory = string.Empty;
+    private DateTime? filterStartDate;
+    private DateTime? filterEndDate;
+    private decimal filteredTotal;
+
+    // Summary fields
+    private decimal monthlyTotal;
+    private decimal weeklyTotal;
+    private decimal categoryTotal;
+    private string selectedCategory = "Food"; // default category
+
+    // Monthly breakdown
+    private Dictionary<string, decimal> monthlyBreakdown = new();
+
+    private ClaimsPrincipal? currentUser;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        currentUser = authState.User;
+
+        categories = CategoryService.GetCategories();
+        ReloadExpenses();
+        LoadSummaries();
+    }
+
+    private void AddExpense()
+    {
+        if (currentUser == null) return;
+
+        ExpenseService.AddExpense(newExpense, currentUser);
+        newExpense = new Expense();
+        ReloadExpenses();
+        LoadSummaries();
+    }
+
+    private void DeleteExpense(int id)
+    {
+        if (currentUser == null) return;
+
+        ExpenseService.DeleteExpense(id, currentUser);
+        ReloadExpenses();
+        LoadSummaries();
+    }
+
+    private void EditExpense(Expense expense)
+    {
+        editingExpense = new Expense
+        {
+            Id = expense.Id,
+            Title = expense.Title,
+            Amount = expense.Amount,
+            Category = expense.Category,
+            Date = expense.Date
+        };
+    }
+
+    private void SaveExpense()
+    {
+        if (editingExpense != null && currentUser != null)
+        {
+            ExpenseService.UpdateExpense(editingExpense, currentUser);
+            editingExpense = null;
+            ReloadExpenses();
+            LoadSummaries();
+        }
+    }
+
+    private void CancelEdit()
+    {
+        editingExpense = null;
+    }
+
+    private void ApplyFilters()
+    {
+        ReloadExpenses();
+    }
+
+    private void ClearFilters()
+    {
+        if (currentUser == null) return;
+
+        filterCategory = string.Empty;
+        filterStartDate = null;
+        filterEndDate = null;
+        ReloadExpenses();
+    }
+
+    private void ReloadExpenses()
+    {
+        if (currentUser == null) return;
+
+        var query = ExpenseService.GetExpenses(currentUser).AsEnumerable();
+
+        if (!string.IsNullOrWhiteSpace(filterCategory))
+        {
+            query = query.Where(e => e.Category == filterCategory);
+        }
+
+        if (filterStartDate.HasValue)
+        {
+            query = query.Where(e => e.Date.Date >= filterStartDate.Value.Date);
+        }
+
+        if (filterEndDate.HasValue)
+        {
+            query = query.Where(e => e.Date.Date <= filterEndDate.Value.Date);
+        }
+
+        expenses = query.OrderByDescending(e => e.Date).ToList();
+        filteredTotal = expenses.Sum(e => e.Amount);
+    }
+
+    private void LoadSummaries()
+    {
+        if (currentUser == null) return;
+
+        var now = DateTime.Now;
+        monthlyTotal = ExpenseService.GetMonthlyTotal(now.Year, now.Month, currentUser);
+        weeklyTotal = ExpenseService.GetWeeklyTotal(now.Year, ISOWeek.GetWeekOfYear(now), currentUser);
+        categoryTotal = ExpenseService.GetCategoryTotal(selectedCategory, currentUser);
+
+        monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
+    }
+}

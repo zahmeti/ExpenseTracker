@@ -1,0 +1,85 @@
+﻿@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@inject AuthenticationStateProvider AuthStateProvider
+@inject IHttpContextAccessor HttpContextAccessor
+@inject NavigationManager Navigation
+@inject IJSRuntime JSRuntime
+
+<div class="sidebar">
+    <ul class="nav flex-column">
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="">
+                <span class="oi oi-home"></span> Home
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="expenses">
+                <span class="oi oi-dollar"></span> Expenses
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="reports">
+                <span class="oi oi-bar-chart"></span> Reports
+            </NavLink>
+        </li>
+        <li class="nav-item px-3">
+            <NavLink class="nav-link" href="budgets">
+                <span class="oi oi-task"></span> Budgets
+            </NavLink>
+        </li>
+    </ul>
+
+    <!-- Sidebar Footer -->
+    <AuthorizeView>
+        <Authorized>
+        <div class="sidebar-footer px-3 mt-auto">
+            <p class="user-email">@userEmail</p>
+            <NavLink class="nav-link logout-link" href="/authentication/logout">
+                <span class="oi oi-account-logout"></span> Logout
+            </NavLink>
+        </div>
+    </Authorized>
+        <NotAuthorized>
+            <div class="sidebar-footer px-3 mt-auto">
+                <NavLink class="nav-link" href="/authentication/login">
+                    <span class="oi oi-account-login"></span> Login
+                </NavLink>
+            </div>
+        </NotAuthorized>
+    </AuthorizeView>
+</div>
+
+@code {
+    private string? userEmail;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated == true)
+        {
+            userEmail = user.Identity.Name;
+        }
+    }
+
+    private async Task HandleLogout()
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context != null)
+        {
+            // ✅ Clear Identity cookie directly
+            context.Response.Cookies.Delete(".AspNetCore.Identity.Application");
+
+            // ✅ Also call SignOutAsync for safety
+            await context.SignOutAsync(IdentityConstants.ApplicationScheme);
+        }
+
+        // ✅ Show toast/snackbar before redirect
+        await JSRuntime.InvokeVoidAsync("showLogoutToast");
+
+        // ✅ Redirect to Login/Register page
+        Navigation.NavigateTo("/authentication/login", forceLoad: true);
+    }
+}

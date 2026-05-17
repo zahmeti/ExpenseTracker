@@ -1,0 +1,103 @@
+@page "/authentication/login"
+@layout AuthLayout
+@inject NavigationManager Navigation
+
+<div class="auth-wrapper">
+    <div class="auth-left">
+        <div class="brand-mark">
+            <span class="oi oi-briefcase"></span>
+        </div>
+        <h2 class="app-title">Expense Tracker</h2>
+        <p class="tagline">Track your expenses. Save more. Achieve your goals.</p>
+        <div class="auth-visual" aria-hidden="true">
+            <div class="balance-preview">
+                <div class="preview-kicker">Total Balance</div>
+                <strong>$2,548.00</strong>
+                <div class="preview-line"></div>
+            </div>
+            <div class="chart-preview">
+                <div class="donut"></div>
+                <div class="legend-lines">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+            <div class="phone-preview">
+                <div class="phone-title">Recent Expenses</div>
+                <div class="expense-row"><span></span>Food <strong>$120</strong></div>
+                <div class="expense-row"><span></span>Transport <strong>$45</strong></div>
+                <div class="expense-row"><span></span>Shopping <strong>$89</strong></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="auth-right">
+        <div class="glass-card login-card p-4">
+            <h3 class="gradient-title text-center">Welcome Back</h3>
+            <p class="auth-subtitle">Log in to continue tracking your expenses</p>
+
+            <form method="post" action="/authentication/login">
+                <input type="hidden" name="returnUrl" value="@ReturnUrl" />
+
+                <div class="mb-3">
+                    <div class="input-shell">
+                        <span class="oi oi-envelope-closed"></span>
+                        <input class="form-control stylish-input" name="email" placeholder="Email address" type="email" />
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <div class="input-shell">
+                        <span class="oi oi-lock-locked"></span>
+                        <input class="form-control stylish-input" name="password" placeholder="Password" type="password" />
+                    </div>
+                </div>
+
+                <div class="auth-options">
+                    <label class="remember-row" for="rememberMe">
+                        <input class="form-check-input" id="rememberMe" name="rememberMe" type="checkbox" />
+                        <span>Remember me</span>
+                    </label>
+                </div>
+
+                <button class="btn btn-gradient w-100" type="submit">Log In</button>
+            </form>
+
+            @if (!string.IsNullOrEmpty(errorMessage))
+            {
+                <p class="validation-message mt-3">@errorMessage</p>
+            }
+
+            <div class="text-center mt-3">
+                <div class="auth-divider"><span>or</span></div>
+                <a href="/authentication/register" class="btn btn-outline-auth w-100">Create an Account</a>
+            </div>
+        </div>
+        <p class="footer-tagline">Track smarter. Spend better.</p>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+    private string ReturnUrl = "/";
+
+    protected override void OnInitialized()
+    {
+        var uri = new Uri(Navigation.Uri);
+        var query = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query);
+
+        if (query.TryGetValue("error", out var error))
+        {
+            errorMessage = error.ToString();
+        }
+
+        if (query.TryGetValue("returnUrl", out var returnUrl) &&
+            returnUrl.ToString().StartsWith("/", StringComparison.Ordinal) &&
+            !returnUrl.ToString().StartsWith("//", StringComparison.Ordinal) &&
+            !returnUrl.ToString().Contains("://", StringComparison.Ordinal))
+        {
+            ReturnUrl = returnUrl.ToString();
+        }
+    }
+}
