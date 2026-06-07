@@ -6,26 +6,40 @@
 @inject NavigationManager Navigation
 @inject IJSRuntime JSRuntime
 
-<div class="sidebar">
-    <ul class="nav flex-column">
-        <li class="nav-item px-3">
-            <NavLink class="nav-link" href="">
-                <span class="oi oi-home"></span> Home
+<div class="app-sidebar">
+    <div class="sidebar-brand">
+        <span class="brand-icon oi oi-dollar"></span>
+        <div>
+            <strong>Expense Tracker</strong>
+            <small>Spend smarter</small>
+        </div>
+    </div>
+
+    <div class="sidebar-section-label">Menu</div>
+
+    <ul class="nav flex-column sidebar-nav">
+        <li class="nav-item">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="nav-icon oi oi-home"></span>
+                <span>Home</span>
             </NavLink>
         </li>
-        <li class="nav-item px-3">
+        <li class="nav-item">
             <NavLink class="nav-link" href="expenses">
-                <span class="oi oi-dollar"></span> Expenses
+                <span class="nav-icon oi oi-dollar"></span>
+                <span>Expenses</span>
             </NavLink>
         </li>
-        <li class="nav-item px-3">
+        <li class="nav-item">
             <NavLink class="nav-link" href="reports">
-                <span class="oi oi-bar-chart"></span> Reports
+                <span class="nav-icon oi oi-bar-chart"></span>
+                <span>Reports</span>
             </NavLink>
         </li>
-        <li class="nav-item px-3">
+        <li class="nav-item">
             <NavLink class="nav-link" href="budgets">
-                <span class="oi oi-task"></span> Budgets
+                <span class="nav-icon oi oi-task"></span>
+                <span>Budgets</span>
             </NavLink>
         </li>
     </ul>
@@ -33,17 +47,25 @@
     <!-- Sidebar Footer -->
     <AuthorizeView>
         <Authorized>
-        <div class="sidebar-footer px-3 mt-auto">
-            <p class="user-email">@userEmail</p>
+        <div class="app-sidebar-footer mt-auto">
+            <div class="account-card">
+                <div class="account-avatar">@GetUserInitial()</div>
+                <div class="account-meta">
+                    <span>Signed in as</span>
+                    <strong>@userEmail</strong>
+                </div>
+            </div>
             <NavLink class="nav-link logout-link" href="/authentication/logout">
-                <span class="oi oi-account-logout"></span> Logout
+                <span class="nav-icon oi oi-account-logout"></span>
+                <span>Logout</span>
             </NavLink>
         </div>
     </Authorized>
         <NotAuthorized>
-            <div class="sidebar-footer px-3 mt-auto">
+            <div class="app-sidebar-footer mt-auto">
                 <NavLink class="nav-link" href="/authentication/login">
-                    <span class="oi oi-account-login"></span> Login
+                    <span class="nav-icon oi oi-account-login"></span>
+                    <span>Login</span>
                 </NavLink>
             </div>
         </NotAuthorized>
@@ -62,6 +84,13 @@
         {
             userEmail = user.Identity.Name;
         }
+    }
+
+    private string GetUserInitial()
+    {
+        return string.IsNullOrWhiteSpace(userEmail)
+            ? "U"
+            : userEmail.Trim()[0].ToString().ToUpperInvariant();
     }
 
     private async Task HandleLogout()

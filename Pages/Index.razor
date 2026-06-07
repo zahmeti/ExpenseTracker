@@ -15,7 +15,7 @@
         <h3 class="gradient-title">Dashboard</h3>
 
         <!-- Motivational Message -->
-        <div class="glass-card p-3 mb-4 text-center">
+        <div class="glass-card budget-message-card @budgetMessageClass p-3 mb-4 text-center">
             <h5>@motivationalMessage</h5>
         </div>
 
@@ -195,6 +195,7 @@
     private decimal topCategoryMax;
     private List<DashboardBudgetAlert> budgetAlerts = new();
     private string motivationalMessage = "";
+    private string budgetMessageClass = "budget-message-good";
 
     private decimal yearlyBudget = 2500m;
     private decimal monthlyBudget = 2500m;
@@ -284,14 +285,40 @@
 
     private void SetMotivationalMessage()
     {
+        if (monthlyBudget <= 0)
+        {
+            motivationalMessage = "Set a monthly budget to track your progress.";
+            budgetMessageClass = "budget-message-neutral";
+            return;
+        }
+
         var monthPercent = monthlyTotal / monthlyBudget * 100;
 
-        if (monthPercent < 70)
+        if (monthPercent < 50)
+        {
             motivationalMessage = "🎉 Great job, you’re well under budget!";
+            budgetMessageClass = "budget-message-good";
+        }
+        else if (monthPercent < 75)
+        {
+            motivationalMessage = "ℹ️ You’ve used over 50% of your monthly budget.";
+            budgetMessageClass = "budget-message-mid";
+        }
         else if (monthPercent < 90)
-            motivationalMessage = "⚠️ Careful — you’re getting close to your monthly limit.";
+        {
+            motivationalMessage = "⚠️ Careful — you’ve used over 75% of your monthly budget.";
+            budgetMessageClass = "budget-message-careful";
+        }
+        else if (monthPercent <= 100)
+        {
+            motivationalMessage = "🚨 Warning — you’ve used over 90% of your monthly budget.";
+            budgetMessageClass = "budget-message-warning";
+        }
         else
-            motivationalMessage = "🚨 Alert! You’ve exceeded 90% of your monthly budget.";
+        {
+            motivationalMessage = "🚨 Alert! You’ve exceeded your monthly budget.";
+            budgetMessageClass = "budget-message-danger";
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

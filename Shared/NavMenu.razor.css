@@ -1,68 +1,195 @@
-.navbar-toggler {
-    background-color: rgba(255, 255, 255, 0.1);
+.app-sidebar {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 22px 18px;
+    color: #273244;
 }
 
-.top-row {
-    height: 3.5rem;
-    background-color: rgba(0,0,0,0.4);
+.sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 10px 22px;
 }
 
-.navbar-brand {
-    font-size: 1.1rem;
+.brand-icon {
+    width: 42px;
+    height: 42px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 14px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #2edfc4, #4f7cff);
+    box-shadow: 0 12px 28px rgba(79, 124, 255, 0.25);
 }
 
-.oi {
-    width: 2rem;
-    font-size: 1.1rem;
-    vertical-align: text-top;
-    top: -2px;
+.sidebar-brand strong {
+    display: block;
+    color: #172033;
+    font-size: 1rem;
+    line-height: 1.15;
+}
+
+.sidebar-brand small {
+    display: block;
+    margin-top: 3px;
+    color: #7a8799;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.sidebar-section-label {
+    margin: 2px 10px 10px;
+    color: #8b97aa;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.sidebar-nav {
+    display: grid;
+    gap: 8px;
 }
 
 .nav-item {
-    font-size: 0.9rem;
-    padding-bottom: 0.5rem;
+    font-size: 0.95rem;
 }
 
-    .nav-item:first-of-type {
-        padding-top: 1rem;
-    }
+.nav-item ::deep a,
+.app-sidebar-footer ::deep a {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 14px;
+    border-radius: 14px;
+    color: #5c687a;
+    font-weight: 800;
+    text-decoration: none;
+    transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
 
-    .nav-item:last-of-type {
-        padding-bottom: 1rem;
-    }
-
-    .nav-item ::deep a {
-        color: #d7d7d7;
-        border-radius: 4px;
-        height: 3rem;
-        display: flex;
-        align-items: center;
-        line-height: 3rem;
-    }
+.nav-icon {
+    width: 24px;
+    display: inline-flex;
+    justify-content: center;
+    color: currentColor;
+    font-size: 1rem;
+}
 
 .nav-item ::deep a.active {
-    background-color: rgba(255,255,255,0.25);
-    color: white;
+    color: #10213f;
+    background: #ffffff;
+    box-shadow: 0 10px 28px rgba(34, 70, 122, 0.12);
 }
 
-.nav-item ::deep a:hover {
-    background-color: rgba(255,255,255,0.1);
-    color: white;
+.nav-item ::deep a.active .nav-icon {
+    color: #18bfa8;
 }
 
-@media (min-width: 641px) {
-    .navbar-toggler {
+.nav-item ::deep a:hover,
+.app-sidebar-footer ::deep a:hover {
+    color: #10213f;
+    background: rgba(255, 255, 255, 0.8);
+    transform: translateX(2px);
+}
+
+.app-sidebar-footer {
+    display: grid;
+    gap: 12px;
+    padding-top: 18px;
+    border-top: 1px solid #e3eaf4;
+}
+
+.account-card {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid #e3eaf4;
+    border-radius: 16px;
+    background: #ffffff;
+    box-shadow: 0 10px 24px rgba(34, 70, 122, 0.08);
+}
+
+.account-avatar {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    border-radius: 12px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #4facfe, #00d6c9);
+    font-size: 0.95rem;
+    font-weight: 900;
+}
+
+.account-meta {
+    min-width: 0;
+}
+
+.account-meta span {
+    display: block;
+    color: #8b97aa;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.account-meta strong {
+    display: block;
+    overflow: hidden;
+    color: #172033;
+    font-size: 0.82rem;
+    font-weight: 900;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.logout-link {
+    color: #eb5d6c !important;
+}
+
+.logout-link .nav-icon {
+    color: #eb5d6c;
+}
+
+.logout-link:hover {
+    color: #cf3347 !important;
+    background: #fff1f3 !important;
+}
+
+@media (max-width: 640.98px) {
+    .app-sidebar {
+        min-height: auto;
+        padding: 14px;
+    }
+
+    .sidebar-brand,
+    .sidebar-section-label,
+    .app-sidebar-footer {
         display: none;
     }
 
-    .collapse {
-        /* Never collapse the sidebar for wide screens */
-        display: block;
+    .sidebar-nav {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
     }
-    
-    .nav-scrollable {
-        /* Allow sidebar to scroll for tall menus */
-        height: calc(100vh - 3.5rem);
-        overflow-y: auto;
+
+    .nav-item ::deep a {
+        min-height: 42px;
+        justify-content: center;
+        padding: 0 8px;
+        font-size: 0;
+    }
+
+    .nav-icon {
+        width: auto;
+        font-size: 1.05rem;
     }
 }

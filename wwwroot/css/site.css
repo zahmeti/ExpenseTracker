@@ -195,6 +195,46 @@ a, .btn-link {
     font-weight: 700;
 }
 
+.budget-message-card {
+    border: 1px solid #edf1f7;
+    border-left: 5px solid #43e97b;
+}
+
+.budget-message-card h5 {
+    margin: 0;
+    font-weight: 800;
+}
+
+.budget-message-neutral {
+    border-left-color: #9aa7b8;
+    background: #f8fbff;
+}
+
+.budget-message-good {
+    border-left-color: #43e97b;
+    background: #f3fff8;
+}
+
+.budget-message-mid {
+    border-left-color: #4facfe;
+    background: #f2f8ff;
+}
+
+.budget-message-careful {
+    border-left-color: #f7b500;
+    background: #fff9e8;
+}
+
+.budget-message-warning {
+    border-left-color: #ff8a4c;
+    background: #fff4ed;
+}
+
+.budget-message-danger {
+    border-left-color: #ff4d5f;
+    background: #fff4f5;
+}
+
 .dashboard-insights-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
