@@ -5,6 +5,7 @@
 @using System.Globalization
 @using System.Security.Claims
 @inject ExpenseService ExpenseService
+@inject BudgetService BudgetService
 @inject IJSRuntime JSRuntime
 @inject AuthenticationStateProvider AuthStateProvider
 @attribute [Authorize]
@@ -52,6 +53,96 @@
             </div>
         </div>
 
+        <div class="dashboard-insights-grid mb-4">
+            <div class="glass-card dashboard-insight-card">
+                <div class="dashboard-card-header">
+                    <div>
+                        <h5 class="section-title mb-1">Monthly Budget Status</h5>
+                        <span class="dashboard-muted">@currentMonthLabel</span>
+                    </div>
+                    <span class="budget-type-pill">Monthly</span>
+                </div>
+
+                @if (activeMonthlyBudget is null)
+                {
+                    <div class="empty-insight">
+                        No monthly budget set for @currentMonthLabel.
+                    </div>
+                }
+                else
+                {
+                    <div class="budget-stat-row">
+                        <div>
+                            <span>Budget</span>
+                            <strong>@activeMonthlyBudget.Limit €</strong>
+                        </div>
+                        <div>
+                            <span>Spent</span>
+                            <strong>@monthlyTotal €</strong>
+                        </div>
+                        <div>
+                            <span>@(monthlyBudgetLeft < 0 ? "Over" : "Remaining")</span>
+                            <strong>@Math.Abs(monthlyBudgetLeft) €</strong>
+                        </div>
+                    </div>
+
+                    <div class="progress stylish-progress monthly-budget-progress">
+                        <div class="progress-bar @(monthlyBudgetExceeded ? "budget-progress-danger" : "")"
+                             role="progressbar"
+                             style="width:@monthlyBudgetProgressWidth%;"
+                             aria-valuenow="@monthlyBudgetProgressWidth"
+                             aria-valuemin="0"
+                             aria-valuemax="100">
+                            @monthlyBudgetPercent%
+                        </div>
+                    </div>
+                }
+            </div>
+
+            <div class="glass-card dashboard-insight-card">
+                <h5 class="section-title mb-3">Top Spending Categories</h5>
+                @if (!topCategories.Any())
+                {
+                    <div class="empty-insight">No spending yet this month.</div>
+                }
+                else
+                {
+                    @foreach (var category in topCategories)
+                    {
+                        var width = topCategoryMax > 0 ? Math.Max(8, (int)Math.Round(category.Value / topCategoryMax * 100)) : 0;
+                        <div class="top-category-row">
+                            <div class="top-category-meta">
+                                <span>@category.Key</span>
+                                <strong>@category.Value €</strong>
+                            </div>
+                            <div class="top-category-track">
+                                <div class="top-category-bar" style="width:@width%;"></div>
+                            </div>
+                        </div>
+                    }
+                }
+            </div>
+        </div>
+
+        @if (budgetAlerts.Any())
+        {
+            <div class="budget-alert-panel mb-4">
+                <div>
+                    <h5>Budget Alerts</h5>
+                    <p>These budgets are currently over their limit.</p>
+                </div>
+                <div class="budget-alert-list">
+                    @foreach (var alert in budgetAlerts)
+                    {
+                        <div class="budget-alert-item">
+                            <strong>@alert.Name</strong>
+                            <span>@alert.Spent € spent of @alert.Limit € · @alert.OverBy € over</span>
+                        </div>
+                    }
+                </div>
+            </div>
+        }
+
         <!-- Recent Expenses -->
         <div class="glass-card p-4">
             <h5 class="section-title">Recent Expenses</h5>
@@ -88,10 +179,21 @@
 </AuthorizeView>
 
 @code {
+    private const string MonthlyBudgetCategory = "__MONTHLY_BUDGET__";
+
     private decimal totalExpenses;
     private decimal monthlyTotal;
     private decimal weeklyTotal;
     private List<Expense> recentExpenses = new();
+    private Budget? activeMonthlyBudget;
+    private decimal monthlyBudgetLeft;
+    private int monthlyBudgetPercent;
+    private int monthlyBudgetProgressWidth;
+    private bool monthlyBudgetExceeded;
+    private string currentMonthLabel = "";
+    private Dictionary<string, decimal> topCategories = new();
+    private decimal topCategoryMax;
+    private List<DashboardBudgetAlert> budgetAlerts = new();
     private string motivationalMessage = "";
 
     private decimal yearlyBudget = 2500m;
@@ -110,8 +212,74 @@
         monthlyTotal = ExpenseService.GetMonthlyTotal(now.Year, now.Month, currentUser);
         weeklyTotal = ExpenseService.GetWeeklyTotal(now.Year, ISOWeek.GetWeekOfYear(now), currentUser);
         recentExpenses = ExpenseService.GetRecentExpenses(currentUser);
+        currentMonthLabel = $"{CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(now.Month)} {now.Year}";
+        LoadDashboardInsights(now);
 
         SetMotivationalMessage();
+    }
+
+    private void LoadDashboardInsights(DateTime now)
+    {
+        if (currentUser == null) return;
+
+        var budgets = BudgetService.GetBudgets(currentUser);
+        activeMonthlyBudget = budgets.FirstOrDefault(b =>
+            b.Category == MonthlyBudgetCategory &&
+            b.DateCreated.Year == now.Year &&
+            b.DateCreated.Month == now.Month);
+
+        if (activeMonthlyBudget != null)
+        {
+            monthlyBudget = activeMonthlyBudget.Limit;
+            monthlyBudgetLeft = activeMonthlyBudget.Limit - monthlyTotal;
+            monthlyBudgetPercent = activeMonthlyBudget.Limit > 0
+                ? (int)Math.Round(monthlyTotal / activeMonthlyBudget.Limit * 100)
+                : 0;
+            monthlyBudgetProgressWidth = Math.Min(monthlyBudgetPercent, 100);
+            monthlyBudgetExceeded = monthlyTotal > activeMonthlyBudget.Limit;
+        }
+        else
+        {
+            monthlyBudgetLeft = monthlyBudget - monthlyTotal;
+            monthlyBudgetPercent = monthlyBudget > 0
+                ? (int)Math.Round(monthlyTotal / monthlyBudget * 100)
+                : 0;
+            monthlyBudgetProgressWidth = Math.Min(monthlyBudgetPercent, 100);
+            monthlyBudgetExceeded = monthlyTotal > monthlyBudget;
+        }
+
+        topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, now.Month)
+            .OrderByDescending(category => category.Value)
+            .Take(5)
+            .ToDictionary(category => category.Key, category => category.Value);
+        topCategoryMax = topCategories.Any() ? topCategories.Max(category => category.Value) : 0;
+
+        budgetAlerts = budgets
+            .Select(budget => GetBudgetAlert(budget, now))
+            .Where(alert => alert != null)
+            .Select(alert => alert!)
+            .ToList();
+    }
+
+    private DashboardBudgetAlert? GetBudgetAlert(Budget budget, DateTime now)
+    {
+        if (currentUser == null) return null;
+
+        var isMonthly = budget.Category == MonthlyBudgetCategory;
+        var spent = isMonthly
+            ? ExpenseService.GetMonthlyTotal(budget.DateCreated.Year, budget.DateCreated.Month, currentUser)
+            : ExpenseService.GetCategoryTotal(budget.Category, currentUser);
+
+        if (spent <= budget.Limit)
+        {
+            return null;
+        }
+
+        var name = isMonthly
+            ? $"Monthly Budget - {CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(budget.DateCreated.Month)} {budget.DateCreated.Year}"
+            : budget.Category;
+
+        return new DashboardBudgetAlert(name, budget.Limit, spent, spent - budget.Limit);
     }
 
     private void SetMotivationalMessage()
@@ -139,4 +307,6 @@
             await JSRuntime.InvokeVoidAsync("setProgress", "weekCircle", weekPercent);
         }
     }
+
+    private record DashboardBudgetAlert(string Name, decimal Limit, decimal Spent, decimal OverBy);
 }

@@ -39,9 +39,13 @@ namespace ExpenseTracker.Services
         public void UpdateBudget(Budget budget, ClaimsPrincipal user)
         {
             var userId = _userManager.GetUserId(user);
-            if (budget.UserId == userId)
+            var existingBudget = _context.Budgets.FirstOrDefault(b => b.Id == budget.Id && b.UserId == userId);
+
+            if (existingBudget != null)
             {
-                _context.Budgets.Update(budget);
+                existingBudget.Category = budget.Category;
+                existingBudget.Limit = budget.Limit;
+                existingBudget.DateCreated = budget.DateCreated;
                 _context.SaveChanges();
             }
         }

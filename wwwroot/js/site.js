@@ -190,3 +190,29 @@ window.showLoginErrorToast = () => {
         setTimeout(() => toast.remove(), 500);
     }, 2500);
 };
+
+window.showBudgetAlertToast = (message) => {
+    const toast = document.createElement("div");
+    toast.innerText = `⚠️ ${message}`;
+    toast.style.position = "fixed";
+    toast.style.top = "20px";
+    toast.style.right = "20px";
+    toast.style.maxWidth = "420px";
+    toast.style.background = "linear-gradient(135deg, #ff4d5f, #ff8a4c)";
+    toast.style.color = "#fff";
+    toast.style.padding = "14px 18px";
+    toast.style.borderRadius = "10px";
+    toast.style.zIndex = "9999";
+    toast.style.fontSize = "14px";
+    toast.style.fontWeight = "700";
+    toast.style.boxShadow = "0 16px 36px rgba(255,77,95,0.3)";
+    toast.style.transition = "opacity 0.5s ease, transform 0.5s ease";
+
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        toast.style.transform = "translateY(-8px)";
+        setTimeout(() => toast.remove(), 500);
+    }, 5000);
+};

@@ -5,7 +5,9 @@
 @using System.Security.Claims
 @inject ExpenseService ExpenseService
 @inject CategoryService CategoryService
+@inject BudgetService BudgetService
 @inject AuthenticationStateProvider AuthStateProvider
+@inject IJSRuntime JSRuntime
 
 <h3 class="gradient-title">Expenses</h3>
 
@@ -36,6 +38,16 @@
         </div>
     </div>
 </div>
+
+@if (!string.IsNullOrWhiteSpace(budgetWarning))
+{
+    <div class="budget-alert-panel mb-4">
+        <div>
+            <h5>Budget alert</h5>
+            <p>@budgetWarning</p>
+        </div>
+    </div>
+}
 
 <!-- Summary Cards -->
 <div class="row mb-4">
@@ -68,7 +80,14 @@
 
     <div class="filter-panel mb-4">
         <div class="row g-3 align-items-end">
-            <div class="col-md-3">
+            <div class="col-lg-3 col-md-6">
+                <label class="filter-label">Search</label>
+                <input class="form-control stylish-input"
+                       value="@filterSearch"
+                       @oninput="OnSearchChanged"
+                       placeholder="Search title, category, amount..." />
+            </div>
+            <div class="col-lg-2 col-md-6">
                 <label class="filter-label">Category</label>
                 <select class="form-select stylish-input" @bind="filterCategory">
                     <option value="">All categories</option>
@@ -78,15 +97,15 @@
                     }
                 </select>
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-6">
                 <label class="filter-label">From date</label>
                 <input type="date" class="form-control stylish-input" @bind="filterStartDate" />
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-2 col-md-6">
                 <label class="filter-label">To date</label>
                 <input type="date" class="form-control stylish-input" @bind="filterEndDate" />
             </div>
-            <div class="col-md-3">
+            <div class="col-lg-3 col-md-12">
                 <div class="d-flex gap-2">
                     <button class="btn btn-gradient flex-fill" @onclick="ApplyFilters">Filter</button>
                     <button class="btn btn-outline-secondary flex-fill" @onclick="ClearFilters">Clear</button>
@@ -154,15 +173,19 @@
 </div>
 
 @code {
+    private const string MonthlyBudgetCategory = "__MONTHLY_BUDGET__";
+
     private List<Expense> expenses = new();
     private Expense newExpense = new();
     private Expense? editingExpense;
 
     private List<Category> categories = new();
+    private string filterSearch = string.Empty;
     private string filterCategory = string.Empty;
     private DateTime? filterStartDate;
     private DateTime? filterEndDate;
     private decimal filteredTotal;
+    private string? budgetWarning;
 
     // Summary fields
     private decimal monthlyTotal;
@@ -189,9 +212,16 @@
     {
         if (currentUser == null) return;
 
+        var addedCategory = newExpense.Category;
+        var addedDate = newExpense.Date == default ? DateTime.Now : newExpense.Date;
         ExpenseService.AddExpense(newExpense, currentUser);
         newExpense = new Expense();
         ReloadExpenses();
+        budgetWarning = GetBudgetWarning(addedCategory, addedDate);
+        if (!string.IsNullOrWhiteSpace(budgetWarning))
+        {
+            _ = JSRuntime.InvokeVoidAsync("showBudgetAlertToast", budgetWarning);
+        }
         LoadSummaries();
     }
 
@@ -237,10 +267,17 @@
         ReloadExpenses();
     }
 
+    private void OnSearchChanged(ChangeEventArgs e)
+    {
+        filterSearch = e.Value?.ToString() ?? string.Empty;
+        ReloadExpenses();
+    }
+
     private void ClearFilters()
     {
         if (currentUser == null) return;
 
+        filterSearch = string.Empty;
         filterCategory = string.Empty;
         filterStartDate = null;
         filterEndDate = null;
@@ -252,6 +289,16 @@
         if (currentUser == null) return;
 
         var query = ExpenseService.GetExpenses(currentUser).AsEnumerable();
+        var search = filterSearch.Trim();
+
+        if (!string.IsNullOrWhiteSpace(search))
+        {
+            query = query.Where(e =>
+                e.Title.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                e.Category.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                e.Amount.ToString(CultureInfo.InvariantCulture).Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                e.Date.ToShortDateString().Contains(search, StringComparison.OrdinalIgnoreCase));
+        }
 
         if (!string.IsNullOrWhiteSpace(filterCategory))
         {
@@ -282,5 +329,50 @@
         categoryTotal = ExpenseService.GetCategoryTotal(selectedCategory, currentUser);
 
         monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
+    }
+
+    private string? GetBudgetWarning(string category, DateTime expenseDate)
+    {
+        if (currentUser == null)
+        {
+            return null;
+        }
+
+        var warnings = new List<string>();
+        var budgets = BudgetService.GetBudgets(currentUser);
+
+        if (!string.IsNullOrWhiteSpace(category))
+        {
+            var categoryBudget = budgets
+                .FirstOrDefault(b => b.Category.Equals(category, StringComparison.OrdinalIgnoreCase));
+
+            if (categoryBudget != null)
+            {
+                var spent = ExpenseService.GetCategoryTotal(categoryBudget.Category, currentUser);
+                if (spent > categoryBudget.Limit)
+                {
+                    warnings.Add($"{categoryBudget.Category}: {spent} € spent of {categoryBudget.Limit} € ({spent - categoryBudget.Limit} € over)");
+                }
+            }
+        }
+
+        var monthlyBudget = budgets.FirstOrDefault(b =>
+            b.Category == MonthlyBudgetCategory &&
+            b.DateCreated.Year == expenseDate.Year &&
+            b.DateCreated.Month == expenseDate.Month);
+
+        if (monthlyBudget != null)
+        {
+            var spent = ExpenseService.GetMonthlyTotal(expenseDate.Year, expenseDate.Month, currentUser);
+            if (spent > monthlyBudget.Limit)
+            {
+                var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(expenseDate.Month);
+                warnings.Add($"Monthly Budget - {monthName} {expenseDate.Year}: {spent} € spent of {monthlyBudget.Limit} € ({spent - monthlyBudget.Limit} € over)");
+            }
+        }
+
+        return warnings.Any()
+            ? $"Budget limit exceeded. {string.Join(" · ", warnings)}."
+            : null;
     }
 }

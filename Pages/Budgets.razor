@@ -1,6 +1,7 @@
 @page "/budgets"
 @using ExpenseTracker.Models
 @using ExpenseTracker.Services
+@using System.Globalization
 @using System.Security.Claims
 @inject ExpenseService ExpenseService
 @inject CategoryService CategoryService
@@ -14,56 +15,123 @@
 <div class="glass-card p-4 mb-4">
     <h5 class="section-title">Add Budget</h5>
     <div class="row g-3">
-        <!-- Category: select OR type -->
-        <div class="col-md-4">
-            <select class="form-select stylish-input" @bind="newBudget.Category">
-                <option value="">-- Select Category --</option>
-                @foreach (var category in categories)
-                {
-                    <option value="@category.Name">@category.Name</option>
-                }
+        <div class="col-md-3">
+            <label class="filter-label">Budget type</label>
+            <select class="form-select stylish-input" @bind="newBudgetType">
+                <option value="monthly">Whole month</option>
+                <option value="category">Category</option>
             </select>
-            <input class="form-control stylish-input mt-2" @bind="newBudget.Category" placeholder="Or type category..." />
         </div>
 
-        <!-- Limit -->
         <div class="col-md-3">
+            <label class="filter-label">@(newBudgetType == "monthly" ? "Scope" : "Category")</label>
+            @if (newBudgetType == "monthly")
+            {
+                <div class="budget-scope-box">All expenses in the selected month</div>
+            }
+            else
+            {
+                <select class="form-select stylish-input" @bind="newBudget.Category">
+                    <option value="">-- Select Category --</option>
+                    @foreach (var category in categories)
+                    {
+                        <option value="@category.Name">@category.Name</option>
+                    }
+                </select>
+                <input class="form-control stylish-input mt-2" @bind="newBudget.Category" placeholder="Or type category..." />
+            }
+        </div>
+
+        <div class="col-md-2">
+            <label class="filter-label">Limit</label>
             <input type="number" class="form-control stylish-input" @bind="newBudget.Limit" placeholder="Limit (€)" />
         </div>
 
-        <!-- Date Created -->
-        <div class="col-md-3">
+        <div class="col-md-2">
+            <label class="filter-label">@(newBudgetType == "monthly" ? "Budget month" : "Start date")</label>
             <input type="date" class="form-control stylish-input" @bind="newBudget.DateCreated" />
         </div>
 
-        <!-- Add Button -->
         <div class="col-md-2">
+            <label class="filter-label">&nbsp;</label>
             <button class="btn btn-gradient w-100" @onclick="AddBudget">➕ Add Budget</button>
         </div>
     </div>
 </div>
 
+@if (budgetAlerts.Any())
+{
+    <div class="budget-alert-panel mb-4">
+        <div>
+            <h5>Budget limit exceeded</h5>
+            <p>One or more budgets are over their spending limit.</p>
+        </div>
+        <div class="budget-alert-list">
+            @foreach (var alert in budgetAlerts)
+            {
+                <div class="budget-alert-item">
+                    <strong>@alert.Name</strong>
+                    <span>@alert.Spent € spent of @alert.Limit € · @alert.OverBy € over</span>
+                </div>
+            }
+        </div>
+    </div>
+}
+
 <!-- Budget Cards -->
 <div class="row">
     @foreach (var budget in budgets)
     {
-        var spent = ExpenseService.GetCategoryTotal(budget.Category, currentUser);
-        var left = budget.Limit - spent;
-        var percent = budget.Limit > 0 ? (int)((spent / budget.Limit) * 100) : 0;
+        var status = GetBudgetStatus(budget);
+        var progressWidth = Math.Min(status.Percent, 100);
 
-        <div class="col-md-4">
-            <div class="glass-card p-3 mb-4">
-                <h5>@budget.Category</h5>
-                <p>Limit: <strong>@budget.Limit €</strong></p>
-                <p>Spent: <strong>@spent €</strong></p>
-                <p>Left: <strong>@left €</strong></p>
-                <p>Created: <strong>@budget.DateCreated.ToShortDateString()</strong></p>
+        <div class="@(status.IsMonthly ? "col-lg-8 col-md-12" : "col-lg-4 col-md-6")">
+            <div class="glass-card budget-card @(status.IsMonthly ? "budget-card-wide" : "") @(status.IsExceeded ? "budget-card-exceeded" : "") p-3 mb-4">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                    <h5>@status.Name</h5>
+                    <span class="budget-type-pill">@(status.IsMonthly ? "Monthly" : "Category")</span>
+                </div>
 
-                <div class="progress stylish-progress">
-                    <div class="progress-bar" role="progressbar"
-                         style="width:@percent%; background: linear-gradient(90deg, #4facfe, #00f2fe); border-radius: 8px;"
-                         aria-valuenow="@percent" aria-valuemin="0" aria-valuemax="100">
-                        @percent%
+                <div class="budget-card-body-grid">
+                    <div>
+                        <div class="budget-card-main-number">
+                            <span>@(status.IsExceeded ? "Over budget" : "Remaining")</span>
+                            <strong>@Math.Abs(status.Left) €</strong>
+                        </div>
+
+                        <div class="progress stylish-progress">
+                            <div class="progress-bar @(status.IsExceeded ? "budget-progress-danger" : "")" role="progressbar"
+                                 style="width:@progressWidth%;"
+                                 aria-valuenow="@progressWidth" aria-valuemin="0" aria-valuemax="100">
+                                @status.Percent%
+                            </div>
+                        </div>
+
+                        @if (status.IsExceeded)
+                        {
+                            <div class="budget-card-alert mt-3">
+                                Alert: this budget is @Math.Abs(status.Left) € over the limit.
+                            </div>
+                        }
+                    </div>
+
+                    <div class="budget-card-detail-grid">
+                        <div>
+                            <span>Limit</span>
+                            <strong>@budget.Limit €</strong>
+                        </div>
+                        <div>
+                            <span>Spent</span>
+                            <strong>@status.Spent €</strong>
+                        </div>
+                        <div>
+                            <span>@(status.IsMonthly ? "Month" : "Created")</span>
+                            <strong>@GetBudgetPeriodLabel(budget)</strong>
+                        </div>
+                        <div>
+                            <span>Status</span>
+                            <strong>@(status.IsExceeded ? "Exceeded" : status.Percent >= 90 ? "Close" : "On track")</strong>
+                        </div>
                     </div>
                 </div>
 
@@ -82,12 +150,15 @@
         <h5 class="section-title">Edit Budget</h5>
         <div class="row g-3">
             <div class="col-md-4">
-                <input type="text" class="form-control stylish-input" @bind="editingBudget.Category" readonly />
+                <label class="filter-label">Budget</label>
+                <input type="text" class="form-control stylish-input" value="@GetBudgetDisplayName(editingBudget!)" readonly />
             </div>
             <div class="col-md-3">
+                <label class="filter-label">Limit</label>
                 <input type="number" class="form-control stylish-input" @bind="editingBudget.Limit" placeholder="Limit (€)" />
             </div>
             <div class="col-md-3">
+                <label class="filter-label">@(IsMonthlyBudget(editingBudget!) ? "Budget month" : "Start date")</label>
                 <input type="date" class="form-control stylish-input" @bind="editingBudget.DateCreated" />
             </div>
             <div class="col-md-2 d-flex gap-2">
@@ -99,33 +170,51 @@
 }
 
 @code {
+    private const string MonthlyBudgetCategory = "__MONTHLY_BUDGET__";
+
     private List<Budget> budgets = new();
     private List<Category> categories = new();
+    private List<BudgetAlert> budgetAlerts = new();
     private Budget newBudget = new();
     private Budget? editingBudget;
     private ClaimsPrincipal? currentUser;
+    private string newBudgetType = "monthly";
 
     protected override async Task OnInitializedAsync()
     {
         var authState = await AuthStateProvider.GetAuthenticationStateAsync();
         currentUser = authState.User;
 
-        budgets = BudgetService.GetBudgets(currentUser);
         categories = CategoryService.GetCategories();
+        ReloadBudgets();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && budgetAlerts.Any())
+        {
+            await JSRuntime.InvokeVoidAsync("showBudgetAlertToast", GetBudgetAlertToastMessage());
+        }
     }
 
     private void AddBudget()
     {
         if (currentUser == null) return;
 
-        if (!string.IsNullOrEmpty(newBudget.Category) && newBudget.Limit > 0)
+        if (newBudget.Limit > 0 && (newBudgetType == "monthly" || !string.IsNullOrWhiteSpace(newBudget.Category)))
         {
             if (newBudget.DateCreated == default)
                 newBudget.DateCreated = DateTime.Now;
 
+            if (newBudgetType == "monthly")
+            {
+                newBudget.Category = MonthlyBudgetCategory;
+            }
+
             BudgetService.AddBudget(newBudget, currentUser);
             newBudget = new Budget();
-            budgets = BudgetService.GetBudgets(currentUser);
+            newBudgetType = "monthly";
+            ReloadBudgets();
         }
     }
 
@@ -146,7 +235,7 @@
         {
             BudgetService.UpdateBudget(editingBudget, currentUser);
             editingBudget = null;
-            budgets = BudgetService.GetBudgets(currentUser);
+            ReloadBudgets();
         }
     }
 
@@ -160,6 +249,73 @@
         if (currentUser == null) return;
 
         BudgetService.DeleteBudget(id, currentUser);
-        budgets = BudgetService.GetBudgets(currentUser);
+        ReloadBudgets();
     }
+
+    private void ReloadBudgets()
+    {
+        if (currentUser == null) return;
+
+        budgets = BudgetService.GetBudgets(currentUser);
+        budgetAlerts = budgets
+            .Select(GetBudgetStatus)
+            .Where(status => status.IsExceeded)
+            .Select(status => new BudgetAlert(status.Name, status.Limit, status.Spent, Math.Abs(status.Left)))
+            .ToList();
+    }
+
+    private string GetBudgetAlertToastMessage()
+    {
+        if (budgetAlerts.Count == 1)
+        {
+            var alert = budgetAlerts[0];
+            return $"{alert.Name} is {alert.OverBy} € over budget.";
+        }
+
+        return $"{budgetAlerts.Count} budgets are over their limits.";
+    }
+
+    private BudgetStatus GetBudgetStatus(Budget budget)
+    {
+        if (currentUser == null)
+        {
+            return new BudgetStatus(GetBudgetDisplayName(budget), IsMonthlyBudget(budget), budget.Limit, 0, budget.Limit, 0, false);
+        }
+
+        var spent = IsMonthlyBudget(budget)
+            ? ExpenseService.GetMonthlyTotal(budget.DateCreated.Year, budget.DateCreated.Month, currentUser)
+            : ExpenseService.GetCategoryTotal(budget.Category, currentUser);
+        var left = budget.Limit - spent;
+        var percent = budget.Limit > 0 ? (int)Math.Round((spent / budget.Limit) * 100) : 0;
+
+        return new BudgetStatus(GetBudgetDisplayName(budget), IsMonthlyBudget(budget), budget.Limit, spent, left, percent, spent > budget.Limit);
+    }
+
+    private static bool IsMonthlyBudget(Budget budget) =>
+        budget.Category == MonthlyBudgetCategory;
+
+    private static string GetBudgetDisplayName(Budget budget)
+    {
+        if (!IsMonthlyBudget(budget))
+        {
+            return budget.Category;
+        }
+
+        var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(budget.DateCreated.Month);
+        return $"Monthly Budget - {monthName} {budget.DateCreated.Year}";
+    }
+
+    private static string GetBudgetPeriodLabel(Budget budget)
+    {
+        if (!IsMonthlyBudget(budget))
+        {
+            return budget.DateCreated.ToShortDateString();
+        }
+
+        var monthName = CultureInfo.CurrentCulture.DateTimeFormat.GetMonthName(budget.DateCreated.Month);
+        return $"{monthName} {budget.DateCreated.Year}";
+    }
+
+    private record BudgetStatus(string Name, bool IsMonthly, decimal Limit, decimal Spent, decimal Left, int Percent, bool IsExceeded);
+    private record BudgetAlert(string Name, decimal Limit, decimal Spent, decimal OverBy);
 }

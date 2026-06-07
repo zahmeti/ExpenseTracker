@@ -34,7 +34,7 @@
 <!-- Filter Dropdown -->
 <div class="filter-section mb-3">
     <label for="monthFilter" class="me-2">View:</label>
-    <select id="monthFilter" class="form-select w-auto d-inline-block" @onchange="OnMonthFilterChanged">
+    <select id="monthFilter" class="form-select w-auto d-inline-block" value="@selectedFilter" @onchange="OnMonthFilterChanged">
         <option value="year">Whole Year</option>
         <option value="current">This Month</option>
         <option value="1">January</option>
@@ -134,6 +134,7 @@
     private Dictionary<string, decimal> topCategories = new();
     private List<Expense> recentExpenses = new();
     private Dictionary<string, decimal> monthlyBreakdown = new();
+    private string selectedFilter = "current";
 
     private ClaimsPrincipal? currentUser;
 
@@ -148,9 +149,17 @@
         totalExpenses = ExpenseService.GetTotalExpenses(currentUser);
         monthlyTotal = ExpenseService.GetMonthlyTotal(now.Year, now.Month, currentUser);
         weeklyTotal = ExpenseService.GetWeeklyTotal(now.Year, ISOWeek.GetWeekOfYear(now), currentUser);
-        topCategories = ExpenseService.GetTopCategories(currentUser);
+        topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, now.Month);
         recentExpenses = ExpenseService.GetRecentExpenses(currentUser);
-        monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
+        monthlyBreakdown = ExpenseService.GetDailyBreakdown(now.Year, now.Month, currentUser);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && currentUser != null)
+        {
+            await RenderCharts();
+        }
     }
 
     private async Task OnMonthFilterChanged(ChangeEventArgs e)
@@ -158,21 +167,22 @@
         if (currentUser == null) return;
 
         var filter = e.Value?.ToString();
+        selectedFilter = filter ?? "current";
         var now = DateTime.Now;
 
-        if (filter == "year")
+        if (selectedFilter == "year")
         {
             monthlyBreakdown = ExpenseService.GetMonthlyBreakdown(now.Year, currentUser);
             topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser);
         }
-        else if (filter == "current")
+        else if (selectedFilter == "current")
         {
             monthlyBreakdown = ExpenseService.GetDailyBreakdown(now.Year, now.Month, currentUser);
             topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, now.Month);
         }
         else
         {
-            int month = int.Parse(filter);
+            int month = int.Parse(selectedFilter);
             monthlyBreakdown = ExpenseService.GetDailyBreakdown(now.Year, month, currentUser);
             topCategories = ExpenseService.GetCategoryBreakdown(now.Year, currentUser, month);
         }
